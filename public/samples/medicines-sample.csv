@@ -1,0 +1,6 @@
+name,quantity,unit,unit_cost,reorder_level,supplier,purchase_date
+Ashwagandha churna,40,g,4.50,500,Kerala Herbals,2026-11-01
+Triphala tablets,120,tablets,1.20,100,Kerala Herbals,2026-11-01
+Brahmi oil,12,bottles,185,4,Vedic Oils Co,2026-11-03
+Dashamoola kashayam,20,bottles,140,5,Vedic Oils Co,2026-11-03
+Shallaki capsules,0,capsules,0,50,,

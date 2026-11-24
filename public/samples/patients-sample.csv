@@ -1,0 +1,6 @@
+name,phone,email,date_of_birth,gender,address_line,area,city,pincode,reached_via,referred_by,notes,registered_on
+Lakshmi R,9840012345,lakshmi.r@example.com,1984-03-12,Female,"12, 3rd Cross Street",Medavakkam,Chennai,600100,Instagram,,Prefers morning slots,2026-01-15
+Kumar S,9123456789,,1975-07-30,Male,"45 Main Road",Tambaram,Chennai,600045,Google Search,Dr. Meena,,2026-01-20
+Priya M,9003412277,priya.m@example.com,1991-11-05,Female,"7, Lake View Apartments",Velachery,Chennai,600042,Walk-in,,Knee pain,2026-02-02
+Arun V,9841098765,,,Male,,Pallikaranai,Chennai,,Doctor referral,Dr. Harsita Devi J.K.,Panchakarma enquiry,2026-02-10
+Divya K,9629017733,divya.k@example.com,1988-09-21,Female,"22 Temple Street",Perumbakkam,Chennai,600100,Facebook,,Women's health follow-up,2026-03-01
