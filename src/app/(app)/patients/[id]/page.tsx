@@ -34,7 +34,14 @@ export default async function PatientPage({ params, searchParams }: { params: { 
   const completed = visits.filter((v) => v.status === "completed");
   const totalFees = completed.reduce((s, v) => s + v.fee, 0);
   const unpaid = completed.filter((v) => v.payment_status === "NOT_PAID").reduce((s, v) => s + v.fee, 0);
-  const addr = [patient.address_line, patient.area, patient.city, patient.pincode].filter(Boolean).join(", ");
+  const addr = [
+    patient.door_number ? `Door ${patient.door_number}` : null,
+    patient.apartment_name,
+    patient.address_line,
+    patient.area,
+    patient.city,
+    patient.pincode,
+  ].filter(Boolean).join(", ");
   const canVisit = can(user.role, "visits:write");
   const canMoney = can(user.role, "finance:write");
 

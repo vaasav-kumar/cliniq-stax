@@ -25,22 +25,24 @@ export default function ImportForm({
   submitLabel: string;
 }) {
   const [state, formAction] = useFormState(action, {});
+  // After a successful import the server redirects, and the state can be empty for a moment.
+  const current = state ?? {};
   return (
     <form action={formAction} className="stack">
       <input type="file" name="file" accept={accept} required />
       <SubmitButton label={submitLabel} />
-      {state.error ? <p className="error">{state.error}</p> : null}
-      {state.rowErrors && state.rowErrors.length > 0 ? (
+      {current.error ? <p className="error">{current.error}</p> : null}
+      {current.rowErrors && current.rowErrors.length > 0 ? (
         <div className="error">
           <p>
-            <strong>Nothing was saved.</strong> Fix these {state.rowErrors.length} problem(s) in your file and upload it again:
+            <strong>Nothing was saved.</strong> Fix these {current.rowErrors.length} problem(s) in your file and upload it again:
           </p>
           <ul>
-            {state.rowErrors.slice(0, 50).map((e, i) => (
+            {current.rowErrors.slice(0, 50).map((e, i) => (
               <li key={i}>Row {e.row}: {e.message}</li>
             ))}
           </ul>
-          {state.rowErrors.length > 50 ? <p>…and {state.rowErrors.length - 50} more.</p> : null}
+          {current.rowErrors.length > 50 ? <p>…and {current.rowErrors.length - 50} more.</p> : null}
         </div>
       ) : null}
     </form>

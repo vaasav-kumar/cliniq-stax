@@ -14,7 +14,7 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-// Generic form wrapper: shows validation errors from the server action and resets on success.
+// Generic form wrapper: shows validation errors from the server action. Typed values are kept when there is an error.
 export default function ActionForm({
   action,
   submitLabel,
@@ -27,11 +27,13 @@ export default function ActionForm({
   className?: string;
 }) {
   const [state, formAction] = useFormState(action, {});
+  // No key here: changing the key remounts the form and clears what the user typed when there is an error.
+  const current = state ?? {};
   return (
-    <form action={formAction} className={className} key={state.error ? "err" : "ok"}>
+    <form action={formAction} className={className}>
       {children}
-      {state.error ? <p className="error">{state.error}</p> : null}
-      {state.ok ? <p className="muted">Saved.</p> : null}
+      {current.error ? <p className="error">{current.error}</p> : null}
+      {current.ok ? <p className="muted">Saved.</p> : null}
       <SubmitButton label={submitLabel} />
     </form>
   );

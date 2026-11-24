@@ -1,18 +1,9 @@
-// Reads one image that can hold three lists under headings "Patients", "Income" and "Expenses".
-// Pure functions only (no database access) so they are easy to test. Database checks live in finance-import-service.ts.
-import { ImportError, type ImportRowError, tableToPatientInputs } from "./import";
+// Bulk import of patients, income and expenses from one CSV file. Every row has a "type" column: patient, income or expense.
+// Pure functions only (no database access). Database checks live in finance-import-service.ts.
+import { COLUMN_ALIASES, ImportError, type ImportRowError, tableToPatientInputs } from "./import";
 import type { PatientInput } from "./repo";
-import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-  ValidationError,
-  optionalText,
-  requireAmount,
-  requireDate,
-  todayIso,
-} from "./domain";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, ValidationError, optionalText, requireAmount, requireDate, todayIso } from "./domain";
 
-export type FinanceSection = "patients" | "income" | "expense";
 export type TransactionRowInput = {
   kind: "income" | "expense";
   entryDate: string;
@@ -20,17 +11,13 @@ export type TransactionRowInput = {
   category: string;
   description: string | null;
 };
-export type ParsedFinance = { patients: PatientInput[]; transactions: TransactionRowInput[] };
+export type ParsedFinance = {
+  patients: PatientInput[];
+  patientRows: number[]; // file row number of each patient, for error messages
+  transactions: TransactionRowInput[];
+};
 
-const HEADINGS: { pattern: RegExp; section: FinanceSection }[] = [
-  { pattern: /^patients?\b[^a-z]*$/i, section: "patients" },
-  { pattern: /^(incomes?|other income)\b[^a-z]*$/i, section: "income" },
-  { pattern: /^(expenses?|expenditures?)\b[^a-z]*$/i, section: "expense" },
-];
-
-const SECTION_LABEL: Record<FinanceSection, string> = { patients: "Patients", income: "Income", expense: "Expenses" };
-
-// Column names accepted in income and expense tables.
+const TYPE_COLUMN = "type";
 const TRANSACTION_COLUMNS: Record<string, "date" | "amount" | "category" | "description"> = {
   date: "date",
   entry_date: "date",
@@ -40,49 +27,38 @@ const TRANSACTION_COLUMNS: Record<string, "date" | "amount" | "category" | "desc
   category: "category",
   description: "description",
   details: "description",
-  notes: "description",
   particulars: "description",
 };
 
-// Splits one line of text into cells. Pipes, tabs and wide spacing win over commas, so amounts like 1,500 stay whole.
-function splitLine(line: string): string[] {
-  if (line.includes("|")) return line.split("|").map((c) => c.trim()).filter((c, i, a) => !(c === "" && (i === 0 || i === a.length - 1)));
-  if (line.includes("\t")) return line.split("\t").map((c) => c.trim());
-  if (/\s{2,}/.test(line)) return line.split(/\s{2,}/).map((c) => c.trim());
-  return line.split(",").map((c) => c.trim());
+const hasOwn = (obj: object, key: string) => Object.prototype.hasOwnProperty.call(obj, key);
+
+// Words used in ledgers that are not the exact category names. The first matching rule wins.
+// Anything still unmatched goes to "Other". The original wording is kept in the description.
+const CATEGORY_RULES: Record<"income" | "expense", { pattern: RegExp; category: string }[]> = {
+  income: [
+    { pattern: /consult/i, category: "Consultation" },
+    { pattern: /pancha/i, category: "Panchakarma" },
+    { pattern: /pain/i, category: "Pain care" },
+    { pattern: /women/i, category: "Women's health" },
+    { pattern: /medic|herb|product|oil|tablet|capsule/i, category: "Products" },
+  ],
+  expense: [
+    { pattern: /rent/i, category: "Rent" },
+    { pattern: /salar|wage|staff/i, category: "Salaries" },
+    { pattern: /medic|herb|oil|tablet|capsule/i, category: "Medicines & herbs" },
+    { pattern: /electric|water|utilit|bill|wifi|internet|phone/i, category: "Utilities" },
+    { pattern: /market|advert|\bads?\b|promo/i, category: "Marketing" },
+    { pattern: /equip|machine|instrument/i, category: "Equipment" },
+  ],
+};
+
+export function normalizeCategory(raw: string, kind: "income" | "expense", categories: readonly string[]): { category: string; note: string | null } {
+  const exact = categories.find((c) => c.toLowerCase() === raw.trim().toLowerCase());
+  if (exact) return { category: exact, note: null };
+  const rule = CATEGORY_RULES[kind].find((r) => r.pattern.test(raw));
+  return { category: rule ? rule.category : "Other", note: raw.trim() };
 }
 
-function linesToTable(lines: string[]): string[][] {
-  return lines.map(splitLine).filter((cells) => cells.some((c) => c !== ""));
-}
-
-// Splits the text into sections. Lines above the first heading are ignored (titles, dates, and so on).
-export function splitByHeadings(text: string): { section: FinanceSection; lines: string[] }[] {
-  const sections: { section: FinanceSection; lines: string[] }[] = [];
-  const seen = new Set<FinanceSection>();
-  let current: { section: FinanceSection; lines: string[] } | null = null;
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    const heading = HEADINGS.find((h) => h.pattern.test(line));
-    if (heading) {
-      if (seen.has(heading.section)) {
-        throw new ImportError([{ row: 1, message: `The "${SECTION_LABEL[heading.section]}" heading appears more than once` }]);
-      }
-      seen.add(heading.section);
-      current = { section: heading.section, lines: [] };
-      sections.push(current);
-    } else if (current) {
-      current.lines.push(line);
-    }
-  }
-  if (sections.length === 0) {
-    throw new ImportError([{ row: 1, message: 'No "Patients", "Income" or "Expenses" heading was found in the image' }]);
-  }
-  return sections;
-}
-
-// Dates may be written yyyy-mm-dd or dd/mm/yyyy (or with - or . between the parts). Indian day-first order is assumed.
 function parseDate(raw: string): string {
   const v = raw.trim();
   const m = v.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
@@ -90,16 +66,16 @@ function parseDate(raw: string): string {
   return requireDate(v, "Date");
 }
 
-// Turns one income or expense table (first row = column names) into rows. Collects every problem instead of stopping at the first.
+// Turns an income or expense table (first row = column names) into rows. Collects every problem instead of stopping at the first.
 export function transactionsFromTable(table: string[][], kind: "income" | "expense", today = todayIso()): TransactionRowInput[] {
   const errors: ImportRowError[] = [];
   if (table.length < 2) throw new ImportError([{ row: 1, message: "The table needs a header row and at least one entry" }]);
 
   const headers = table[0].map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_"));
   const columns = headers.map((h) => {
-    const column = TRANSACTION_COLUMNS[h];
+    const column = hasOwn(TRANSACTION_COLUMNS, h) ? TRANSACTION_COLUMNS[h] : null;
     if (!column) errors.push({ row: 1, message: `Unknown column "${h}"` });
-    return column ?? null;
+    return column;
   });
   for (const required of ["amount", "category"] as const) {
     if (!columns.includes(required)) errors.push({ row: 1, message: `Missing required column for ${required}` });
@@ -127,10 +103,10 @@ export function transactionsFromTable(table: string[][], kind: "income" | "expen
 
       const categoryText = cell("category");
       if (!categoryText) throw new ValidationError("Category is missing");
-      const category = categories.find((c) => c.toLowerCase() === categoryText.toLowerCase());
-      if (!category) throw new ValidationError(`Category "${categoryText}" is not one of: ${categories.join(", ")}`);
+      const { category, note } = normalizeCategory(categoryText, kind, categories);
+      const description = [note, cell("description")].filter(Boolean).join(" · ");
 
-      rows.push({ kind, entryDate, amount, category, description: optionalText(cell("description"), 300) });
+      rows.push({ kind, entryDate, amount, category, description: optionalText(description, 300) });
     } catch (e) {
       if (e instanceof ValidationError) errors.push({ row: rowNumber, message: e.message });
       else throw e;
@@ -140,27 +116,72 @@ export function transactionsFromTable(table: string[][], kind: "income" | "expen
   return rows;
 }
 
-// Parses the whole image text. Every section is checked; the error messages name the section and row.
-export function parseFinanceText(text: string, today = todayIso()): ParsedFinance {
-  const sections = splitByHeadings(text);
-  const errors: ImportRowError[] = [];
-  const patients: PatientInput[] = [];
-  const transactions: TransactionRowInput[] = [];
+// Parses the whole file. Patient rows and income/expense rows are checked separately, but every error keeps its file row number.
+export function parseFinanceTable(table: string[][], today = todayIso()): ParsedFinance {
+  if (table.length < 2) throw new ImportError([{ row: 1, message: "The file needs a header row and at least one row" }]);
 
-  for (const { section, lines } of sections) {
-    const label = SECTION_LABEL[section];
-    const table = linesToTable(lines);
+  const headers = table[0].map((h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_"));
+  const errors: ImportRowError[] = [];
+  const typeCol = headers.indexOf(TYPE_COLUMN);
+  if (typeCol === -1) errors.push({ row: 1, message: 'Missing required column "type" (patient, income or expense)' });
+  headers.forEach((h) => {
+    if (h !== TYPE_COLUMN && !hasOwn(COLUMN_ALIASES, h) && !hasOwn(TRANSACTION_COLUMNS, h)) {
+      errors.push({ row: 1, message: `Unknown column "${h}"` });
+    }
+  });
+  if (errors.length) throw new ImportError(errors);
+
+  type Row = { row: number; cells: string[] };
+  const groups: Record<"patient" | "income" | "expense", Row[]> = { patient: [], income: [], expense: [] };
+  table.slice(1).forEach((cells, index) => {
+    if (!cells.some((c) => c.trim() !== "")) return;
+    const row = index + 2;
+    const type = (cells[typeCol] ?? "").trim().toLowerCase();
+    if (type === "patient" || type === "income" || type === "expense") groups[type].push({ row, cells });
+    else errors.push({ row, message: 'Type must be "patient", "income" or "expense"' });
+  });
+
+  // Builds a table with just the columns this kind of row uses, so the existing validators can be reused.
+  const subTable = (keep: (h: string) => boolean, rows: Row[]) => {
+    const idx = headers.map((h, i) => (keep(h) ? i : -1)).filter((i) => i >= 0);
+    return {
+      table: [idx.map((i) => headers[i]), ...rows.map((r) => idx.map((i) => r.cells[i] ?? ""))],
+      rowNumbers: rows.map((r) => r.row),
+    };
+  };
+  const attempt = (label: string, rowNumbers: number[], fn: () => void) => {
     try {
-      if (section === "patients") patients.push(...tableToPatientInputs(table));
-      else transactions.push(...transactionsFromTable(table, section === "income" ? "income" : "expense", today));
+      fn();
     } catch (e) {
       if (!(e instanceof ImportError)) throw e;
-      for (const err of e.errors) errors.push({ row: err.row, message: `${label}, row ${err.row}: ${err.message}` });
+      for (const err of e.errors) {
+        const row = err.row >= 2 ? rowNumbers[err.row - 2] ?? err.row : err.row;
+        errors.push({ row, message: `${label}: ${err.message}` });
+      }
     }
+  };
+
+  const patients: PatientInput[] = [];
+  const patientRows: number[] = [];
+  if (groups.patient.length) {
+    const sub = subTable((h) => hasOwn(COLUMN_ALIASES, h), groups.patient);
+    attempt("Patients", sub.rowNumbers, () => {
+      patients.push(...tableToPatientInputs(sub.table));
+      patientRows.push(...sub.rowNumbers);
+    });
   }
-  if (errors.length) throw new ImportError(errors);
+  const transactions: TransactionRowInput[] = [];
+  for (const kind of ["income", "expense"] as const) {
+    if (!groups[kind].length) continue;
+    const sub = subTable((h) => hasOwn(TRANSACTION_COLUMNS, h), groups[kind]);
+    attempt(kind === "income" ? "Income" : "Expenses", sub.rowNumbers, () =>
+      transactions.push(...transactionsFromTable(sub.table, kind, today)),
+    );
+  }
+
+  if (errors.length) throw new ImportError(errors.sort((a, b) => a.row - b.row));
   if (patients.length === 0 && transactions.length === 0) {
-    throw new ImportError([{ row: 1, message: "No rows were found under the headings" }]);
+    throw new ImportError([{ row: 1, message: "No rows were found in the file" }]);
   }
-  return { patients, transactions };
+  return { patients, patientRows, transactions };
 }

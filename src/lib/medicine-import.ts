@@ -1,4 +1,4 @@
-// Medicine list import (CSV or OCR text). Same rules as the patient import: validate every row, save all or nothing.
+// Medicine list import (CSV). Same rules as the patient import: validate every row, save all or nothing.
 // A row with a quantity is a purchase: it adds stock and books the cost as an expense. A row without quantity just adds the medicine.
 import type { Database } from "./db";
 import { ValidationError, optionalText } from "./domain";

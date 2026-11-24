@@ -21,6 +21,7 @@ export default async function CsvImportPage() {
             <tr><th>phone *</th><td>10-digit mobile number</td></tr>
             <tr><th>reached_via *</th><td>Google Search, Instagram, Facebook, Website, Walk-in, Phone call, Doctor referral, Patient referral, Other</td></tr>
             <tr><th>email, gender, address_line, area, city, pincode, referred_by, notes</th><td>Optional</td></tr>
+            <tr><th>apartment, apartment_name, door_number</th><td>Optional. apartment is yes or no; apartment_name and door_number are required when apartment is yes</td></tr>
             <tr><th>date_of_birth</th><td>Optional, YYYY-MM-DD</td></tr>
             <tr><th>registered_on</th><td>Optional, YYYY-MM-DD. Leave empty for today</td></tr>
           </tbody>

@@ -1,0 +1,6 @@
+type,name,phone,reached_via,date,amount,category,description
+patient,Lakshmi R,9840012345,Instagram,,,,
+patient,Kumar S,9123456789,Walk-in,,,,
+income,,,,03/11/2026,1500,Panchakarma,Course fee - Lakshmi R
+income,,,,04/11/2026,400,Consultation,Consultation - Kumar S
+expense,,,,04/11/2026,800,Rent,November rent

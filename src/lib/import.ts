@@ -1,4 +1,4 @@
-// Bulk patient import: turns CSV text or OCR text into patient rows, then validates every row.
+// Bulk patient import: turns CSV text into patient rows, then validates every row.
 // Pure functions only (no database access) so they are easy to test. The database checks live in repo.ts.
 import { ValidationError } from "./domain";
 import { parsePatient, type PatientInput } from "./repo";
@@ -14,7 +14,7 @@ export class ImportError extends Error {
 }
 
 // Column names accepted in the header row, mapped to the patient field they fill.
-const COLUMN_ALIASES: Record<string, keyof PatientInput> = {
+export const COLUMN_ALIASES: Record<string, keyof PatientInput> = {
   name: "name",
   full_name: "name",
   phone: "phone",
@@ -24,6 +24,11 @@ const COLUMN_ALIASES: Record<string, keyof PatientInput> = {
   dob: "dateOfBirth",
   gender: "gender",
   address: "addressLine",
+  apartment: "isApartment",
+  is_apartment: "isApartment",
+  apartment_name: "apartmentName",
+  door_number: "doorNumber",
+  door_num: "doorNumber",
   address_line: "addressLine",
   area: "area",
   city: "city",
@@ -128,31 +133,18 @@ export function tableToPatientInputs(table: string[][]): PatientInput[] {
 }
 
 // Checks phones are unique within the file. Existing clinic phones are checked by the caller.
-export function findDuplicatePhones(inputs: PatientInput[]): ImportRowError[] {
+export function findDuplicatePhones(inputs: PatientInput[], rowNumbers: number[] = inputs.map((_, i) => i + 2)): ImportRowError[] {
   const seen = new Map<string, number>();
   const errors: ImportRowError[] = [];
   inputs.forEach((input, index) => {
     const phone = parsePatient(input).phone;
+    const row = rowNumbers[index];
     const first = seen.get(phone);
     if (first !== undefined) {
-      errors.push({ row: index + 2, message: `Phone ${phone} is also on row ${first}` });
+      errors.push({ row, message: `Phone ${phone} is also on row ${first}` });
     } else {
-      seen.set(phone, index + 2);
+      seen.set(phone, row);
     }
   });
   return errors;
-}
-
-// Turns OCR text into a table. Columns can be separated by tabs, |, ; or 2+ spaces, or by commas.
-export function ocrTextToTable(text: string): string[][] {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
-  return lines.map((line) => {
-    if (line.includes(",")) return line.split(",").map((c) => c.trim());
-    if (line.includes("\t")) return line.split("\t").map((c) => c.trim());
-    if (line.includes("|")) return line.split("|").map((c) => c.trim()).filter((c, i, a) => !(c === "" && (i === 0 || i === a.length - 1)));
-    return line.split(/\s{2,}/).map((c) => c.trim());
-  });
 }

@@ -12,9 +12,6 @@ export default async function MedicineImportChooser() {
         <Link href="/medicines/import/csv" style={{ color: "inherit" }}>
           <div className="card"><h2>1. Upload CSV</h2><p className="muted">One medicine per row. Best option.</p></div>
         </Link>
-        <Link href="/medicines/import/image" style={{ color: "inherit" }}>
-          <div className="card"><h2>2. Upload image</h2><p className="muted">A clear photo or scan of a printed list with the same column names.</p></div>
-        </Link>
       </div>
       <p className="section"><Link href="/medicines/add">← Back</Link></p>
     </>

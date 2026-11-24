@@ -29,6 +29,9 @@ export type PatientInput = {
   dateOfBirth?: unknown;
   gender?: unknown;
   addressLine?: unknown;
+  isApartment?: unknown;
+  apartmentName?: unknown;
+  doorNumber?: unknown;
   area?: unknown;
   city?: unknown;
   pincode?: unknown;
@@ -38,8 +41,18 @@ export type PatientInput = {
   registeredOn?: unknown;
 };
 
+// Accepts a checkbox value ("on") or yes/no words from a CSV file.
+function parseFlag(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  return typeof value === "string" && ["on", "true", "yes", "y", "1"].includes(value.trim().toLowerCase());
+}
+
 export function parsePatient(input: PatientInput) {
   const pincode = optionalText(input.pincode, 6);
+  // Apartment name and door number are required only when the apartment box is checked.
+  const isApartment = parseFlag(input.isApartment);
+  const apartmentName = isApartment ? requireText(input.apartmentName, "Apartment name", 120) : null;
+  const doorNumber = isApartment ? requireText(input.doorNumber, "Door number", 30) : null;
   if (pincode && !/^\d{6}$/.test(pincode)) throw new ValidationError("Pincode must be 6 digits");
   const email = optionalText(input.email, 120);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ValidationError("Email looks invalid");
@@ -49,6 +62,9 @@ export function parsePatient(input: PatientInput) {
     email,
     date_of_birth: optionalDate(input.dateOfBirth, "Date of birth"),
     gender: optionalText(input.gender, 20),
+    is_apartment: isApartment,
+    apartment_name: apartmentName,
+    door_number: doorNumber,
     address_line: optionalText(input.addressLine, 200),
     area: optionalText(input.area, 100),
     city: optionalText(input.city, 100) ?? "Chennai",
@@ -63,10 +79,10 @@ export function parsePatient(input: PatientInput) {
 export async function createPatient(db: Database, clinicId: number, input: PatientInput): Promise<number> {
   const p = parsePatient(input);
   const row = await db.one<{ id: number }>(
-    `INSERT INTO patients (clinic_id, name, phone, email, date_of_birth, gender, address_line, area, city, pincode,
-                           reached_via, referred_by, notes, registered_on)
-     VALUES (@clinic_id, @name, @phone, @email, @date_of_birth, @gender, @address_line, @area, @city, @pincode,
-             @reached_via, @referred_by, @notes, @registered_on)
+    `INSERT INTO patients (clinic_id, name, phone, email, date_of_birth, gender, is_apartment, apartment_name, door_number,
+                           address_line, area, city, pincode, reached_via, referred_by, notes, registered_on)
+     VALUES (@clinic_id, @name, @phone, @email, @date_of_birth, @gender, @is_apartment, @apartment_name, @door_number,
+             @address_line, @area, @city, @pincode, @reached_via, @referred_by, @notes, @registered_on)
      RETURNING id`,
     { ...p, clinic_id: clinicId },
   );
@@ -81,6 +97,9 @@ export type PatientRow = {
   email: string | null;
   date_of_birth: string | null;
   gender: string | null;
+  is_apartment: boolean;
+  apartment_name: string | null;
+  door_number: string | null;
   address_line: string | null;
   area: string | null;
   city: string;

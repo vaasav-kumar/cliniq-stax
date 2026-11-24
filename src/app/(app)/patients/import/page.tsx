@@ -15,12 +15,6 @@ export default async function BulkImportChooser() {
             <p className="muted">Best option. One patient per row, with a header row. A sample file is provided.</p>
           </div>
         </Link>
-        <Link href="/patients/import/image" style={{ color: "inherit" }}>
-          <div className="card">
-            <h2>2. Upload image</h2>
-            <p className="muted">A clear photo or scan of a printed table with the same column names as the CSV.</p>
-          </div>
-        </Link>
       </div>
       <p className="section"><Link href="/patients/add">← Back</Link></p>
     </>

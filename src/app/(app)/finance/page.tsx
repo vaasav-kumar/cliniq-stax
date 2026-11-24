@@ -1,6 +1,6 @@
 import ActionForm from "@/components/ActionForm";
-import FinanceImageImport from "@/components/FinanceImageImport";
-import { importFinanceImage } from "./actions";
+import ImportForm from "@/components/ImportForm";
+import { importFinanceCsv } from "./actions";
 import { addTransaction } from "@/app/actions";
 import { getDb } from "@/lib/db";
 import { buildDashboard, defaultPeriod, listTransactions } from "@/lib/repo";
@@ -42,18 +42,18 @@ export default async function FinancePage({ searchParams }: { searchParams: { fr
 
       {canWrite ? (
         <section className="card section">
-          <h2>Import from image</h2>
+          <h2>Import from CSV</h2>
           <p className="muted">
-            Upload a clear photo or scan (PNG, JPEG or WebP, up to 4 MB). Put a heading line before each list:
-            <code> Patients</code>, <code>Income</code> or <code>Expenses</code>. Under each heading, the first line names the
-            columns and the rows follow.
+            One file can hold patients, income and expenses. Every row starts with a <code>type</code> column:
+            <code> patient</code>, <code>income</code> or <code>expense</code>. Then fill the columns that row needs.
           </p>
           <p className="muted">
-            Patients: <code>name, phone, reached_via</code> (plus any optional patient columns). Income and expenses:
-            <code> date, amount, category, description</code> (date is optional and defaults to today). The text is read on this
-            computer. Nothing is saved unless every row passes.
+            Patient rows: <code>name, phone, reached_via</code> (plus optional patient columns). Income and expense rows:
+            <code> date, amount, category, description</code>. Date is optional and defaults to today (dd/mm/yyyy or yyyy-mm-dd).
+            Nothing is saved unless every row passes.
           </p>
-          <FinanceImageImport action={importFinanceImage} />
+          <p><a href="/samples/finance-sample.csv" download>Download sample CSV</a></p>
+          <ImportForm action={importFinanceCsv} accept=".csv,text/csv" submitLabel="Upload and import" />
         </section>
       ) : null}
 

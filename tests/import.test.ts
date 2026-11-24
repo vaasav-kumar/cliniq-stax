@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { registerClinic } from "../src/lib/accounts";
-import { findDuplicatePhones, ImportError, ocrTextToTable, parseCsv, tableToPatientInputs } from "../src/lib/import";
+import { findDuplicatePhones, ImportError, parseCsv, tableToPatientInputs } from "../src/lib/import";
 import { importPatients } from "../src/lib/import-service";
 import { createPatient } from "../src/lib/repo";
 import { freshDb } from "./helpers";
@@ -74,15 +74,6 @@ test("duplicate phones inside the file are reported on the later row", () => {
   assert.equal(dups[0].row, 3);
 });
 
-test("OCR text is split into columns by tab, pipe, comma or wide spacing", () => {
-  const text = "name\tphone\treached_via\nLakshmi R | 9840012345 | Instagram\nKumar S,9123456789,Walk-in\nPriya M    9003412277    Website\n";
-  assert.deepEqual(ocrTextToTable(text), [
-    ["name", "phone", "reached_via"],
-    ["Lakshmi R", "9840012345", "Instagram"],
-    ["Kumar S", "9123456789", "Walk-in"],
-    ["Priya M", "9003412277", "Website"],
-  ]);
-});
 
 test("bulk import saves every patient when all rows are valid", async (t: TestContext) => {
   const db = await freshDb(t);
@@ -109,4 +100,21 @@ test("bulk import saves nothing when one row is wrong or its phone already exist
 
   const count = await db.one<{ n: number }>("SELECT COUNT(*) AS n FROM patients WHERE clinic_id = @clinicId", { clinicId });
   assert.equal(count?.n, 1, "the valid row in the same file was not saved");
+});
+
+test("apartment name and door number are required only when the apartment box is checked", async () => {
+  const { parsePatient } = await import("../src/lib/repo");
+  const base = { name: "Lakshmi R", phone: "9840012345", reachedVia: "Instagram" };
+  const house = parsePatient({ ...base, isApartment: false, apartmentName: "Ignored", doorNumber: "9" });
+  assert.equal(house.is_apartment, false);
+  assert.equal(house.apartment_name, null);
+  assert.equal(house.door_number, null);
+
+  const flat = parsePatient({ ...base, isApartment: "on", apartmentName: " Sai Towers ", doorNumber: "4B" });
+  assert.equal(flat.is_apartment, true);
+  assert.equal(flat.apartment_name, "Sai Towers");
+  assert.equal(flat.door_number, "4B");
+
+  assert.throws(() => parsePatient({ ...base, isApartment: "on", apartmentName: "", doorNumber: "4B" }), /Apartment name is required/);
+  assert.throws(() => parsePatient({ ...base, isApartment: "yes", apartmentName: "Sai", doorNumber: "" }), /Door number is required/);
 });

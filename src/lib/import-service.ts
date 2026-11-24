@@ -5,8 +5,13 @@ import { createPatient, parsePatient, type PatientInput } from "./repo";
 
 // Checks the patient rows against each other and against the clinic's existing phones. Throws ImportError if any row is wrong.
 // Row numbers match the file: row 2 is the first patient after the header row.
-export async function checkPatientInputs(db: Database, clinicId: number, inputs: PatientInput[]): Promise<void> {
-  const errors: ImportRowError[] = [...findDuplicatePhones(inputs)];
+export async function checkPatientInputs(
+  db: Database,
+  clinicId: number,
+  inputs: PatientInput[],
+  rowNumbers: number[] = inputs.map((_, i) => i + 2),
+): Promise<void> {
+  const errors: ImportRowError[] = [...findDuplicatePhones(inputs, rowNumbers)];
   const phones = inputs.map((i) => parsePatient(i).phone);
   const existing = await db.query<{ phone: string }>(
     "SELECT DISTINCT phone FROM patients WHERE clinic_id = @clinicId AND phone = ANY(@phones)",
@@ -15,7 +20,7 @@ export async function checkPatientInputs(db: Database, clinicId: number, inputs:
   const existingPhones = new Set(existing.map((r) => r.phone));
   inputs.forEach((_input, index) => {
     const phone = phones[index];
-    if (existingPhones.has(phone)) errors.push({ row: index + 2, message: `Phone ${phone} already belongs to a patient` });
+    if (existingPhones.has(phone)) errors.push({ row: rowNumbers[index], message: `Phone ${phone} already belongs to a patient` });
   });
   if (errors.length) throw new ImportError(errors.sort((a, b) => a.row - b.row));
 }

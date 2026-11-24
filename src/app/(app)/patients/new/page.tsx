@@ -1,4 +1,5 @@
 import ActionForm from "@/components/ActionForm";
+import ApartmentFields from "@/components/ApartmentFields";
 import { addPatient } from "@/app/actions";
 import { REACH_SOURCES, todayIso } from "@/lib/domain";
 import { requireUser } from "@/lib/session-server";
@@ -38,6 +39,7 @@ export default async function NewPatientPage() {
           </div>
           <h2 style={{ marginTop: 8 }}>Address</h2>
           <div className="form-grid">
+            <ApartmentFields />
             <label style={{ gridColumn: "1 / -1" }}>Address line<input name="addressLine" placeholder="Door no, street, landmark" /></label>
             <label>Area<input name="area" placeholder="e.g. Medavakkam" /></label>
             <label>City<input name="city" defaultValue="Chennai" /></label>
