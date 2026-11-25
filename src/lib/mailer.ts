@@ -2,9 +2,14 @@ import nodemailer from "nodemailer";
 
 // Sends notification emails through the SMTP server named in the environment.
 // Nothing is sent unless SMTP_HOST is set. Failures are logged and never block the caller.
-export const CLINIC_SIGNUP_NOTIFY_TO = process.env.CLINIC_SIGNUP_NOTIFY_TO || "harshavedic@gmail.com";
+// The recipient comes only from the environment so no address is hardcoded in the repo or build output.
+export const CLINIC_SIGNUP_NOTIFY_TO = process.env.CLINIC_SIGNUP_NOTIFY_TO || "";
 
 export async function sendMail(to: string, subject: string, text: string): Promise<boolean> {
+  if (!to) {
+    console.warn(`[mail] no recipient configured; email "${subject}" was not sent`);
+    return false;
+  }
   const host = process.env.SMTP_HOST;
   if (!host) {
     console.warn(`[mail] SMTP_HOST is not set; email "${subject}" to ${to} was not sent`);
