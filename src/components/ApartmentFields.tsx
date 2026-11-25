@@ -15,16 +15,16 @@ export default function ApartmentFields({
   const [checked, setChecked] = useState(defaultChecked);
   return (
     <>
-      <label style={{ gridColumn: "1 / -1", flexDirection: "row", alignItems: "center", gap: 8 }}>
+      <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--ink)" }}>
         <input
           type="checkbox"
           name="isApartment"
           checked={checked}
           onChange={(e) => setChecked(e.target.checked)}
-          style={{ width: "auto" }}
+          style={{ width: 16, height: 16, margin: 0, padding: 0, flex: "none" }}
         />
-        Lives in an apartment
-      </label>
+        <span>Lives in an apartment</span>
+      </div>
       {checked ? (
         <>
           <label>Apartment name *<input name="apartmentName" required maxLength={120} defaultValue={defaultApartmentName} /></label>
