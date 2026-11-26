@@ -26,6 +26,11 @@ export function resetThrottle(): void {
   failures.clear();
 }
 
+// Clears the sign-in lock for one email, e.g. after a successful password reset.
+export function clearFailures(email: string): void {
+  failures.delete(email);
+}
+
 export async function registerClinic(
   db: Database,
   input: {

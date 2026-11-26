@@ -8,6 +8,7 @@ import { CLINIC_SIGNUP_NOTIFY_TO, sendMail } from "@/lib/mailer";
 import { createSession, deleteSession } from "@/lib/sessions";
 import { clearSessionCookie, currentUser, setSessionCookie, sessionTokenFromCookie } from "@/lib/session-server";
 import { recordAudit } from "@/lib/audit";
+import { createPasswordReset, resetPasswordWithToken, RESET_TTL_MINUTES } from "@/lib/password-reset";
 import type { ActionState } from "./actions";
 
 function str(form: FormData, key: string): string {
@@ -102,4 +103,37 @@ export async function changeMyPassword(_prev: ActionState, form: FormData): Prom
   // Sessions were cleared by the password change; start a fresh one for this browser.
   setSessionCookie(await createSession(db, user.id, user.clinicId));
   return { ok: true };
+}
+
+// Emails a one-time reset link. Always redirects to the same message, whether or not the account exists.
+export async function requestPasswordReset(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const db = getDb();
+  const result = await createPasswordReset(db, str(form, "email"));
+  if (result) {
+    // The base URL comes from configuration, never from the request, so a forged Host header cannot change the link.
+    const base = process.env.APP_URL;
+    if (!base) {
+      console.error("[password-reset] APP_URL is not set; reset email was not sent");
+    } else {
+      const link = `${base.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(result.token)}`;
+      await sendMail(
+        result.email,
+        "Reset your Harsha Vedic CRM password",
+        `Use this link to choose a new password:\n\n${link}\n\nThe link works once and expires in ${RESET_TTL_MINUTES} minutes. If you did not ask for this, you can ignore this email.`,
+      );
+    }
+  }
+  redirect("/forgot-password?sent=1");
+}
+
+export async function resetPassword(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const password = str(form, "password");
+  if (password !== str(form, "confirm")) return { error: "The two passwords do not match" };
+  try {
+    await resetPasswordWithToken(getDb(), str(form, "token"), password);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: e.message };
+    throw e;
+  }
+  redirect("/login?reset=1");
 }
